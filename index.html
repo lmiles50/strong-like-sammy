@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Set of 6 seats at Shenendehowa Graduation!</title>
+  <style>
+    body {
+      background-color: #fff;
+      color: #000;
+      font-family: Avenir, Arial, sans-serif;
+      text-align: center;
+      padding: 2rem;
+    }
+    h1 {
+      color: orange;
+    }
+    .form-container {
+      background: #f6f6f6;
+      border: 2px solid orange;
+      border-radius: 10px;
+      padding: 2rem;
+      display: inline-block;
+    }
+    label, input {
+      display: block;
+      margin: 0.5rem auto;
+      font-size: 1rem;
+    }
+    input[type="text"], input[type="tel"], input[type="number"] {
+      padding: 0.5rem;
+      width: 80%;
+    }
+    input[type="submit"] {
+      background-color: orange;
+      color: white;
+      padding: 0.5rem 1rem;
+      border: none;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .error {
+      color: red;
+    }
+    .success {
+      color: green;
+    }
+  </style>
+</head>
+<body>
+  <h1>Set of 6 seats at Shenendehowa Graduation!</h1>
+  <p><strong>Highest two Bidders Win!</strong></p>
+  <p><em>Strong like Sammy Pirate's Hideout Auction Fundraiser</em></p>
+  <div class="form-container">
+    <p><strong>Current Highest Bid: $<span id="highestBid">Loading...</span></strong></p>
+    <form id="bidForm">
+      <label for="name">Name:</label>
+      <input type="text" id="name" required />
+      <label for="phone">Phone Number:</label>
+      <input type="tel" id="phone" required />
+      <label for="bid">Your Bid Amount ($):</label>
+      <input type="number" id="bid" required />
+      <input type="submit" value="Submit Bid" />
+      <p id="message" class="error"></p>
+    </form>
+  </div>
+
+  <script>
+    const sheetURL = "https://docs.google.com/forms/d/e/1FAIpQLSeXkj0Xozb15YNtDSdV3kZ3RMi9SdInhnZzceqwnJuTYa_F7g/formResponse";
+    const form = document.getElementById("bidForm");
+    const message = document.getElementById("message");
+    const highestBidEl = document.getElementById("highestBid");
+    let currentHighestBid = 0;
+
+    async function fetchHighestBid() {
+      try {
+        const res = await fetch("https://opensheet.elk.sh/10HjYZXVCWI_XfhlyWc7aGkMKQEl_VNT5VfLrDLGqqH4/Form%20Responses%201");
+        const data = await res.json();
+        const bids = data.map(row => parseFloat(row["Bid Amount"] || "0"));
+        currentHighestBid = Math.max(...bids, 0);
+        highestBidEl.textContent = currentHighestBid.toFixed(2);
+      } catch (err) {
+        highestBidEl.textContent = "Error";
+        console.error("Could not load bid data:", err);
+      }
+    }
+
+    // Initial fetch
+    fetchHighestBid();
+
+    // Poll every 5 seconds (5000 ms) to update highest bid
+    setInterval(fetchHighestBid, 5000);
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      message.textContent = "";
+      message.className = "";
+
+      const name = document.getElementById("name").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const bid = parseFloat(document.getElementById("bid").value);
+
+      // Check for reset condition
+      if (name === "ADMIN" && bid === 0 && phone !== "") {
+        try {
+          const formData = new FormData();
+          formData.append("entry.402274558", name);
+          formData.append("entry.988025774", phone);
+          formData.append("entry.446696194", bid);
+
+          await fetch(sheetURL, { method: "POST", mode: "no-cors", body: formData });
+          message.className = "success";
+          message.textContent = "Reset successful! Bids are cleared for testing.";
+          form.reset();
+          await fetchHighestBid();
+        } catch (err) {
+          message.className = "error";
+          message.textContent = "Error during reset.";
+          console.error(err);
+        }
+        return; // Exit after reset
+      }
+
+      // Normal bid validation
+      if (bid <= currentHighestBid) {
+        message.className = "error";
+        message.textContent = "Your bid must be higher than the current highest bid!";
+        return;
+      }
+
+      if (phone === "") {
+        message.className = "error";
+        message.textContent = "Phone number is required.";
+        return;
+      }
+
+      // Submit normal bid
+      try {
+        const formData = new FormData();
+        formData.append("entry.402274558", name);     // Name
+        formData.append("entry.988025774", phone);    // Phone
+        formData.append("entry.446696194", bid);      // Bid Amount
+
+        await fetch(sheetURL, { method: "POST", mode: "no-cors", body: formData });
+        message.className = "success";
+        message.textContent = "Your bid has been submitted!";
+        form.reset();
+        await fetchHighestBid();  // Refresh immediately after submit
+      } catch (err) {
+        message.className = "error";
+        message.textContent = "There was an error submitting your bid.";
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
